@@ -48,7 +48,7 @@
 #'@importFrom tidyr pivot_wider separate
 #'@importFrom ca ca
 #'@importFrom stats addmargins
-#'@importFrom ggrepel geom_text_repel
+#'@importFrom ggrepel geom_label_repel
 #'
 #'@export
 ca_ae <- function(data, id, group, ae_class, label = "AE",
@@ -58,7 +58,6 @@ ca_ae <- function(data, id, group, ae_class, label = "AE",
   temp <- enquos(group = group,
                  ae = ae_class, id = id,
                  .ignore_empty = "all")
-  #aux <- data %>% select(!!!temp)
 
   aux <- data %>% select(!!!temp) %>% na.exclude() %>%
     distinct(id, .data$ae, .keep_all = TRUE)
@@ -69,9 +68,7 @@ ca_ae <- function(data, id, group, ae_class, label = "AE",
   q <- 1 - p
   rownames(q) <- paste0(rownames(q), "_C")
   tab.ca <- rbind(p, q)
-  # tab.ca <- p
 
-  #tab <- with(aux, table(ae, group))
   res.ca <- ca(tab.ca)
 
   names(dimnames(p)) <- c("ae", "group")
@@ -100,11 +97,6 @@ ca_ae <- function(data, id, group, ae_class, label = "AE",
 
   if (ncol(tab_abs) < 4){
 
-    principal.coordinates.col <-
-      tibble(dim_1 = as.numeric(res.ca$colcoord*res.ca$sv)) %>% #
-      mutate(labels = rownames(res.ca$colcoord),
-             type = "col", contr = 1, mass = 0.5)
-
     aux <- res.ca$rowcoord*sqrt(res.ca$rowmass)
 
     contr <- round(100*(res.ca$rowcoord*sqrt(res.ca$rowmass))^2, 2)
@@ -126,6 +118,20 @@ ca_ae <- function(data, id, group, ae_class, label = "AE",
              mass = average/100) %>%
       filter(.data$contr > contr_threshold & .data$mass > mass_threshold)
     colnames(standard.coordinates.row)[2] <- "dim_1"
+
+    group_mass <- ifelse(is.finite(min(standard.coordinates.row$mass, na.rm = TRUE)) &
+                           is.finite(max(standard.coordinates.row$mass, na.rm = TRUE)),
+                         (min(standard.coordinates.row$mass, na.rm = TRUE) +
+                            max(standard.coordinates.row$mass, na.rm = TRUE))/2,
+                         ifelse(is.finite(max(standard.coordinates.row$mass, na.rm = TRUE)),
+                                0.5*max(standard.coordinates.row$mass, na.rm = TRUE),
+                                ifelse(is.finite(min(standard.coordinates.row$mass, na.rm = TRUE)),
+                                       1.5*min(standard.coordinates.row$mass, na.rm = TRUE), 0.5)))
+
+    principal.coordinates.col <-
+      tibble(dim_1 = as.numeric(res.ca$colcoord*res.ca$sv)) %>% #
+      mutate(labels = rownames(res.ca$colcoord),
+             type = "col", contr = 1, mass = group_mass)
 
     selected_classes <- as.character(standard.coordinates.row$labels)
 
@@ -160,7 +166,9 @@ ca_ae <- function(data, id, group, ae_class, label = "AE",
     asymmetric_plot <- asymmetric_plot +
       geom_vline(xintercept = 0, linetype = 2) +
       geom_point() +
-      geom_text_repel(aes(label = .data$labels)) +
+      geom_label_repel(aes(label = .data$labels),
+                       xlim = c(-Inf, Inf), ylim = c(-Inf, Inf),
+                       min.segment.length = 0) +
       scale_colour_manual(values = c("red", "blue")) +
       labs(x = paste0("Dim 1 ", "(", round(explained_var[1], 2), "%)")) +
       theme_minimal() +
@@ -182,13 +190,6 @@ ca_ae <- function(data, id, group, ae_class, label = "AE",
     colnames(tab_contr)[-1] <- "Dim 1"
 
   } else {
-    aux <- res.ca$colcoord*res.ca$sv
-    colnames(aux) <- paste0("dim_", 1:ncol(aux))
-    principal.coordinates.col <-
-      as_tibble(aux) %>%
-      mutate(labels = rownames(res.ca$colcoord),
-             type = "col",
-             contr = 1, mass = 0.5)
 
     aux <- res.ca$rowcoord*sqrt(res.ca$rowmass)
     colnames(aux) <- paste0("dim_", 1:ncol(aux))
@@ -212,6 +213,23 @@ ca_ae <- function(data, id, group, ae_class, label = "AE",
              mass = average/100) %>%
       filter(.data$contr > contr_threshold & .data$mass > mass_threshold)
     selected_classes <- as.character(standard.coordinates.row$labels)
+
+    group_mass <- ifelse(is.finite(min(standard.coordinates.row$mass, na.rm = TRUE)) &
+      is.finite(max(standard.coordinates.row$mass, na.rm = TRUE)),
+      (min(standard.coordinates.row$mass, na.rm = TRUE) +
+        max(standard.coordinates.row$mass, na.rm = TRUE))/2,
+      ifelse(is.finite(max(standard.coordinates.row$mass, na.rm = TRUE)),
+             0.5*max(standard.coordinates.row$mass, na.rm = TRUE),
+             ifelse(is.finite(min(standard.coordinates.row$mass, na.rm = TRUE)),
+                    1.5*min(standard.coordinates.row$mass, na.rm = TRUE), 0.5)))
+
+    aux <- res.ca$colcoord%*%diag(res.ca$sv)
+    colnames(aux) <- paste0("dim_", 1:ncol(aux))
+    principal.coordinates.col <-
+      as_tibble(aux) %>%
+      mutate(labels = rownames(res.ca$colcoord),
+             type = "col",
+             contr = 1, mass = group_mass)
 
     if (nrow(standard.coordinates.row) > 0)
       standard.coordinates.row <- standard.coordinates.row %>%
@@ -245,7 +263,9 @@ ca_ae <- function(data, id, group, ae_class, label = "AE",
       geom_hline(yintercept = 0, linetype = 2) +
       geom_vline(xintercept = 0, linetype = 2) +
       geom_point() +
-      geom_text_repel(aes(label = .data$labels)) +
+      geom_label_repel(aes(label = .data$labels),
+                       xlim = c(-Inf, Inf), ylim = c(-Inf, Inf),
+                       min.segment.length = 0) +
       scale_colour_manual(values = c("red", "blue")) +
       labs(x = paste0("Dim 1 ", "(", round(explained_var[1], 2), "%)"),
            y = paste0("Dim 2 ", "(", round(explained_var[2], 2), "%)")) +
