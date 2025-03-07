@@ -19,8 +19,7 @@
 #'
 #'
 #'@examples
-#'\dontrun{
-#'library(magrittr)
+#'if (interactive()) {
 #'library(dplyr)
 #'patient_id <- 1:100
 #'group <- c(rep("A", 50), rep("B", 50))
@@ -37,7 +36,6 @@
 #'              }
 #'
 #'@rawNamespace import(shiny, except = c(dataTableOutput, renderDataTable))
-#'@import magrittr
 #'@import dplyr
 #'@importFrom shinyjs js useShinyjs extendShinyjs
 #'@importFrom DT renderDataTable dataTableOutput
